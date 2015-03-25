@@ -9,7 +9,7 @@
 # LJ parameters for oxygen-oxygen interactions -> A = 5.81935564E5 ; B = 5.94825035E2
 # Charges of Oxygen and Hydrogen = -1.5197E1 and 7.598699 respectively
 
-
+#=
 require("argparse") ## argparse approx 4 secs to runtime
 using ArgParse
 
@@ -24,6 +24,9 @@ z = ArgParseSettings()
     "-a"
        help = "H-bond cutoff angle"
        default = 30
+    "-f"
+       help= "Number of frames"
+       default = 10000
 end
 
 parsed_args = parse_args(ARGS,z)
@@ -31,14 +34,13 @@ parsed_args = parse_args(ARGS,z)
 cutoff_dist = parsed_args["d"]
 cutoff_energy = parsed_args["e"]
 cutoff_angle = parsed_args["a"]
+total_frames = parsed_args["f"]
+=#
 
-#=
 cutoff_dist = 3.5
 cutoff_energy = -1.5
 cutoff_angle = 30
-=#
-num_waters = 5
-
+total_frames = 10000
 
 type Atom
     name::String
@@ -313,17 +315,19 @@ function calc_stats(tot_all_occ,total_frames,sums,all_PW,four_PW)
 
     frac_all_occ = tot_all_occ/total_frames
     frac_PW = all_PW/tot_all_occ
+    tot_frac_PW = all_PW/total_frames
     frac_sm_PW = four_PW/tot_all_occ
     avgE = sums/tot_all_occ
-    return frac_all_occ, frac_PW, frac_sm_PW, avgE 
+    return frac_all_occ, frac_PW, frac_sm_PW, avgE,tot_frac_PW 
 end
 
 
-function write_summary(f,frac_all_occ, frac_PW, frac_sm_PW, avgE,PW_frames)
+function write_summary(f,frac_all_occ, frac_PW, frac_sm_PW, avgE,PW_frames, tot_frac_PW)
 
     println(f, "Summary: ")
     println(f, "Fraction all occupied =",frac_all_occ)
-    println(f, "Fraction complete proton wire = ", frac_PW)
+    println(f, "Fraction of all occupied w/ a complete proton wire = ", frac_PW)
+    println(f, "Fraction of all frames w/ a complete proton wire = ", tot_frac_PW)
     println(f, "Fraction 4-H20 proton wire = ",frac_sm_PW)
     for i =[1:length(avgE)-1]
         println(f,"<E",string(i),"> = ",avgE[i])
@@ -341,11 +345,13 @@ end
 
 ss = system_create()
 
+num_waters = length(ss.water_files)
+
 output1 = open("water_analysis.out", "w")
 
-println(output1,"Frame# Energies between pairs #hbonds, whether it has a full PW, and partial PW")
+println(output1,"Frame#, Energies between pairs, #hbonds, whether it has a full PW, and partial PW")
 
-total_frames = tot_all_occ = all_PW = four_PW = 0
+tot_all_occ = all_PW = four_PW = 0
 
 PW_frames = String[]
 
@@ -353,7 +359,7 @@ sums = zeros(num_waters,1)
 
 
 while (frame = read_next_frame(ss)) != None
-    total_frames += 1
+
 
     if length(frame.waters) == num_waters
         tot_all_occ += 1
@@ -405,11 +411,11 @@ end
 
 close(output1)
 
-frac_all_occ, frac_PW, frac_sm_PW, avgE = calc_stats(tot_all_occ,total_frames,sums,all_PW,four_PW)
+frac_all_occ, frac_PW, frac_sm_PW, avgE, tot_frac_PW = calc_stats(tot_all_occ,total_frames,sums,all_PW,four_PW)
 
 output2 = open("water_sum.out", "w")
 
-write_summary(output2,frac_all_occ, frac_PW, frac_sm_PW, avgE,PW_frames)
+write_summary(output2,frac_all_occ, frac_PW, frac_sm_PW, avgE,PW_frames,tot_frac_PW)
 
 close(output2)
 
